@@ -198,9 +198,9 @@ else:
                                         duplicate=False, num_neurons=79)
         sensor_size = dataset.sensor_size
     elif args.dataset == "dvs_gesture":
-        transform = Compose([Downsample(spatial_factor=0.25)])
+        transform = Compose([Downsample(spatial_factor=0.125)])
         dataset = DVSGesture(save_to='./data', train=args.train, transform=transform)
-        sensor_size = (32, 32, 2)
+        sensor_size = (16, 16, 2)
 
     # Get number of input and output neurons from dataset 
     # and round up outputs to power-of-two

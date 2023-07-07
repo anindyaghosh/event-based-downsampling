@@ -1,5 +1,6 @@
 import time
 import numpy as np
+from numpy.lib.recfunctions import unstructured_to_structured
 
 events = np.load('dvs_struct_array.npy')
 
@@ -88,16 +89,21 @@ def diff_downsample(events: np.ndarray, sensor_size: tuple, target_size: tuple, 
         coordinates_pos = np.stack(np.nonzero(np.maximum(frame_spike > noise_threshold, 0))).T
         coordinates_neg = np.stack(np.nonzero(np.maximum(-frame_spike > noise_threshold, 0))).T
         
+        # Reset spiking coordinates to zero
+        frame_spike[coordinates_pos] = 0
+        frame_spike[coordinates_neg] = 0
+        
+        # Add to event buffer
         events_new.append(np.column_stack((coordinates_pos, np.ones((coordinates_pos.shape[0],1)), time*np.ones((coordinates_pos.shape[0],1)))))
         events_new.append(np.column_stack((coordinates_neg, np.zeros((coordinates_neg.shape[0],1)), time*np.ones((coordinates_neg.shape[0],1)))))
         
     events_new = np.concatenate(events_new.copy())
     
-    return np.core.records.fromarrays(events_new.copy().T, dtype=events.dtype)
+    return unstructured_to_structured(events_new.copy(), dtype=events.dtype)
 
 # Time bin of 1 ms
 events = time_bin_numpy(events, 1.0)
 t1 = time.perf_counter()
-events_diff = diff_downsample(events, (128, 128, 2), (16, 16))
+events_diff = diff_downsample(events, (128, 128, 2), (16, 16), noise_threshold=20)
 t2 = time.perf_counter()
 print(f'{t2-t1:.2f}')
