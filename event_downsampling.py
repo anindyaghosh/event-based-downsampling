@@ -4,11 +4,13 @@ from numpy.lib.recfunctions import unstructured_to_structured
 def naive_downsample(events: np.ndarray, sensor_size: tuple, target_size: tuple):
     """Downsample the classic "naive" Tonic way. Multiply x/y values by a spatial_factor 
     obtained by dividing sensor size by the target size.
+    
     Parameters:
         events (ndarray): ndarray of shape [num_events, num_event_channels].
         sensor_size (tuple): a 3-tuple of x,y,p for sensor_size.
         target_size (tuple): a 2-tuple of x,y denoting new down-sampled size for events to be
                              re-scaled to (new_width, new_height).
+                             
     Returns:
         the downsampled input events.
     """
@@ -19,16 +21,18 @@ def naive_downsample(events: np.ndarray, sensor_size: tuple, target_size: tuple)
     
     spatial_factor = np.asarray(target_size) / sensor_size[:-1]
 
-    events["x"] = events["x"] * spatial_factor[1]
-    events["y"] = events["y"] * spatial_factor[0]
+    events["x"] = events["x"] * spatial_factor[0]
+    events["y"] = events["y"] * spatial_factor[1]
 
     return events
 
 def time_bin_numpy(events: np.ndarray, time_bin_interval: float):
     """Temporally downsample the events into discrete time bins as stipulated by time_bin_intervals.
+    
     Parameters:
         events (ndarray): ndarray of shape [num_events, num_event_channels].
         time_bin_interval (float): time bin size for events e.g. every 0.5 ms: time_bin_interval = 0.5.
+        
     Returns:
         the input events with rewritten timestamps.
     """
@@ -42,6 +46,7 @@ def time_bin_numpy(events: np.ndarray, time_bin_interval: float):
 def feedback_inhibition(events: np.ndarray, target_size: tuple, dt: float, buffer_layer_parameters: dict, inhibitory_layer_parameters: dict,
                         buffer_postsynaptic_strength: float = 0.005, inhibitory_postsynaptic_strength: float = 4.0, delay: int = 1):
     """Feedback inhibition to eliminate high-frequency noise inspired by locust brains.
+    
     Parameters:
         events (ndarray): ndarray of shape [num_events, num_event_channels].
         target_size (tuple): a 2-tuple of x,y denoting new down-sampled size for events to be
@@ -52,6 +57,7 @@ def feedback_inhibition(events: np.ndarray, target_size: tuple, dt: float, buffe
         buffer_postsynaptic_strength (float): synaptic strength of buffer to inhibitory neuron populations.
         inhibitory_postsynaptic_strength (float): synaptic strength of inhibitory to buffer neuron populations.
         delay (int): dendritic delay in timesteps.
+        
     Returns:
         the downsampled events after feedback inhibition.
         
@@ -159,6 +165,7 @@ def differentiator_downsample(events: np.ndarray, sensor_size: tuple, target_siz
     """Downsample using an integrate-and-fire (I-F) neuron model with an additional differentiator 
     with a noise threshold similar to the membrane potential threshold in the I-F model. Multiply 
     x/y values by a spatial_factor obtained by dividing sensor size by the target size.
+    
     Parameters:
         events (ndarray): ndarray of shape [num_events, num_event_channels].
         sensor_size (tuple): a 3-tuple of x,y,p for sensor_size.
@@ -168,6 +175,7 @@ def differentiator_downsample(events: np.ndarray, sensor_size: tuple, target_siz
         differentiator_time_bins (int): number of equally spaced time bins with respect to the dt 
                                         to be used for the differentiator.
         noise_threshold (int): number of events before a spike representing a new event is emitted.
+        
     Returns:
         the downsampled input events using the differentiator method.
     """
@@ -213,12 +221,14 @@ def integrator_downsample(events: np.ndarray, sensor_size: tuple, target_size: t
     """Downsample using an integrate-and-fire (I-F) neuron model with a noise threshold similar to 
     the membrane potential threshold in the I-F model. Multiply x/y values by a spatial_factor 
     obtained by dividing sensor size by the target size.
+    
     Parameters:
         events (ndarray): ndarray of shape [num_events, num_event_channels].
         sensor_size (tuple): a 3-tuple of x,y,p for sensor_size.
         target_size (tuple): a 2-tuple of x,y denoting new down-sampled size for events to be
                              re-scaled to (new_width, new_height).
         noise_threshold (int): number of events before a spike representing a new event is emitted.
+        
     Returns:
         the downsampled input events using the differentiator method.
     """
