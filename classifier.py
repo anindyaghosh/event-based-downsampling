@@ -138,6 +138,7 @@ parser.add_argument("--hidden-input-sparsity", type=float, nargs="*")
 parser.add_argument("--hidden-recurrent-sparsity", type=float, nargs="*")
 
 parser.add_argument("--downsampling-method", type=str, required=True)
+parser.add_argument("--target-resolution", type=int, required=True)
 
 args = parser.parse_args()
 
@@ -170,8 +171,6 @@ args.hidden_recurrent_sparsity = pad_hidden_layer_argument(args.hidden_recurrent
                          # for arg, val in vars(args).items()
                          # if arg not in ["train", "cpu", "resume_epoch",
                                         # "test_all", "kernel_profiling"])
-                                        
-unique_suffix = "_"
 
 # If dataset is MNIST
 spikes = []
@@ -207,7 +206,7 @@ else:
         # dataset = DVSGesture(save_to='./data', train=args.train, transform=transform)
         
         dataset = DVSGesture(save_to='./data', train=args.train)
-        sensor_size = (32, 32, 2)
+        sensor_size = (args.target_resolution, args.target_resolution, 2)
 
     # Get number of input and output neurons from dataset 
     # and round up outputs to power-of-two
@@ -221,12 +220,11 @@ else:
             events = event_ds.naive_downsample(events, sensor_size=(128, 128, 2), target_size=sensor_size[:-1])
         elif args.downsampling_method == 'integrator':
             events = event_ds.integrator_downsample(events=events, sensor_size=(128, 128, 2), target_size=sensor_size[:-1],
-                                                          dt=0.5, noise_threshold=2)
+                                                          dt=0.25, noise_threshold=2)
         elif args.downsampling_method == 'differentiator':
             events = event_ds.differentiator_downsample(events=events, sensor_size=(128, 128, 2), target_size=sensor_size[:-1],
-                                                          dt=0.5, differentiator_time_bins=33, 
+                                                          dt=0.25, differentiator_time_bins=33, 
                                                           noise_threshold=2)
-        
         
         num_events += len(events)
         
@@ -234,6 +232,7 @@ else:
                                               sensor_size))
         labels.append(label)
     print(f"Total spikes: {num_events}")
+    unique_suffix = f"{args.downsampling_method}_{str(args.target_resolution)}"
 
 # Determine max spikes and latest spike time
 max_spikes = calc_max_spikes(spikes)
