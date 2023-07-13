@@ -18,6 +18,8 @@ from time import perf_counter
 from ml_genn.utils.data import (calc_latest_spike_time, calc_max_spikes,
                                 log_latency_encode_data, preprocess_tonic_spikes)
 
+import event_downsampling as event_ds
+
 
 class CSVTrainLog(Callback):
     def __init__(self, filename, output_pop, resume):
@@ -135,6 +137,8 @@ parser.add_argument("--hidden-model", choices=["lif", "alif"], nargs="*")
 parser.add_argument("--hidden-input-sparsity", type=float, nargs="*")
 parser.add_argument("--hidden-recurrent-sparsity", type=float, nargs="*")
 
+parser.add_argument("--downsampling-method", type=str, required=True)
+
 args = parser.parse_args()
 
 num_hidden_layers = max(len(args.hidden_size), 
@@ -198,8 +202,11 @@ else:
                                         duplicate=False, num_neurons=79)
         sensor_size = dataset.sensor_size
     elif args.dataset == "dvs_gesture":
-        transform = Compose([Downsample(spatial_factor=0.25)])
-        dataset = DVSGesture(save_to='./data', train=args.train, transform=transform)
+        
+        # transform = Compose([Downsample(spatial_factor=0.25)])
+        # dataset = DVSGesture(save_to='./data', train=args.train, transform=transform)
+        
+        dataset = DVSGesture(save_to='./data', train=args.train)
         sensor_size = (32, 32, 2)
 
     # Get number of input and output neurons from dataset 
@@ -208,10 +215,25 @@ else:
     num_output = len(dataset.classes)
 
     # Preprocess spike
+    num_events = 0
     for events, label in dataset:
+        if args.downsampling_method == 'naive':
+            events = event_ds.naive_downsample(events, sensor_size=(128, 128, 2), target_size=sensor_size[:-1])
+        elif args.downsampling_method == 'integrator':
+            events = event_ds.integrator_downsample(events=events, sensor_size=(128, 128, 2), target_size=sensor_size[:-1],
+                                                          dt=0.5, noise_threshold=2)
+        elif args.downsampling_method == 'differentiator':
+            events = event_ds.differentiator_downsample(events=events, sensor_size=(128, 128, 2), target_size=sensor_size[:-1],
+                                                          dt=0.5, differentiator_time_bins=33, 
+                                                          noise_threshold=2)
+        
+        
+        num_events += len(events)
+        
         spikes.append(preprocess_tonic_spikes(events, dataset.ordering,
                                               sensor_size))
         labels.append(label)
+    print(f"Total spikes: {num_events}")
 
 # Determine max spikes and latest spike time
 max_spikes = calc_max_spikes(spikes)
