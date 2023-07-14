@@ -21,7 +21,7 @@
 arguments_path="jade_bash.txt"
 LINES=`wc --lines < $arguments_path`
 
-for i in $(seq ${SLURM_ARRAY_TASK_ID} 30 $LINES); do
+for i in $(seq ${SLURM_ARRAY_TASK_ID} 10 $LINES); do
         ARGS=`head -$i $arguments_path | tail -1`
 		
 		python classifier.py --train --seed 2345 --dataset dvs_gesture --num-epochs 100 --hidden-size 256 256 --hidden-recurrent False True --hidden-model alif alif --hidden-input-sparsity 0.1 0.1 --hidden-recurrent-sparsity 0.01 $ARGS

@@ -64,16 +64,17 @@ def differentiator_downsample(events: np.ndarray, sensor_size: tuple, target_siz
         noise_threshold (int): number of events before a spike representing a new event is emitted.
         
     Returns:
-        the downsampled input events using the differentiator method.
+        the down-sampled input events using the differentiator method.
     """
         
     assert "x" and "y" and "t" in events.dtype.names
     
     # Create time bins according to differentiator
-    events = time_bin_numpy(events, dt / differentiator_time_bins)
+    # events = time_bin_numpy(events, dt / differentiator_time_bins)
     
     # Call integrator method
     events_integrated = integrator_downsample(events=events, sensor_size=sensor_size, target_size=target_size, 
+                                              dt=(dt / differentiator_time_bins), 
                                               noise_threshold=noise_threshold)
     
     # All event times
@@ -118,12 +119,15 @@ def integrator_downsample(events: np.ndarray, sensor_size: tuple, target_size: t
         noise_threshold (int): number of events before a spike representing a new event is emitted.
         
     Returns:
-        the downsampled input events using the differentiator method.
+        the down-sampled input events using the integrator method.
     """
         
     assert "x" and "y" and "t" in events.dtype.names
     
     events = events.copy()
+    
+    if np.issubdtype(np.int64, events["t"].dtype):
+        dt *= 1000
     
     # Re-format event times to new temporal resolution
     events = time_bin_numpy(events, dt)
