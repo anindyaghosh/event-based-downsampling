@@ -239,6 +239,8 @@ else:
                                                         dt=0.05, differentiator_time_bins=10, 
                                                         noise_threshold=2)
         
+        import pdb
+        pdb.set_trace()
         num_events += len(events)
         
         spikes.append(preprocess_tonic_spikes(events, dataset.ordering,

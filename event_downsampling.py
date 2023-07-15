@@ -1,7 +1,7 @@
 import numpy as np
 from numpy.lib.recfunctions import unstructured_to_structured
 
-# from tonic.slicers import slice_events_by_time
+from tonic.slicers import slice_events_by_time
 
 # events = np.load('dvs_struct_array.npy')
 
@@ -129,38 +129,32 @@ def integrator_downsample(events: np.ndarray, sensor_size: tuple, target_size: t
     if np.issubdtype(np.int64, events["t"].dtype):
         dt *= 1000
     
-    # Re-format event times to new temporal resolution
-    events = time_bin_numpy(events, dt)
-    # events_sliced = slice_events_by_time(events, time_window=0.5)
-    
     # Downsample
     spatial_factor = np.asarray(target_size) / sensor_size[:-1]
 
     events["x"] = events["x"] * spatial_factor[0]
     events["y"] = events["y"] * spatial_factor[1]
     
-    # All event times
-    event_times = np.unique(events["t"])
-    
-    # Separate by polarity
-    events_positive = events[events["p"] == 1]
-    events_negative = events[events["p"] == 0]
+    # Re-format event times to new temporal resolution
+    # events = time_bin_numpy(events, dt)
+    events_sliced = slice_events_by_time(events, time_window=dt)
     
     # Running buffer of events in each pixel
     frame_spike = np.zeros(np.flip(target_size))
     
     events_new = []
     
-    for time in event_times:
-        xy_pos = events_positive[events_positive["t"] == time][["x", "y"]]
-        xy_neg = events_negative[events_negative["t"] == time][["x", "y"]]
+    for time, event in enumerate(events_sliced):
+        # Separate by polarity
+        xy_pos = event[event["p"] == 1]
+        xy_neg = event[event["p"] == 0]
         
         # Sum in 2D space using histogram
         frame_histogram = np.subtract(np.histogram2d(xy_pos["y"], xy_pos["x"], [range(target_size[1] + 1), range(target_size[0] + 1)])[0],
                                       np.histogram2d(xy_neg["y"], xy_neg["x"], [range(target_size[1] + 1), range(target_size[0] + 1)])[0])
         
         frame_spike += frame_histogram
-        
+            
         coordinates_pos = np.stack(np.nonzero(np.maximum(frame_spike >= noise_threshold, 0))).T
         coordinates_neg = np.stack(np.nonzero(np.maximum(-frame_spike >= noise_threshold, 0))).T
         
@@ -168,12 +162,13 @@ def integrator_downsample(events: np.ndarray, sensor_size: tuple, target_size: t
         frame_spike[coordinates_pos] = 0
         frame_spike[coordinates_neg] = 0
         
-        # Add to event buffer
-        events_new.append(np.column_stack((coordinates_pos, np.ones((coordinates_pos.shape[0],1)), time*np.ones((coordinates_pos.shape[0],1)))))
-        events_new.append(np.column_stack((coordinates_neg, np.zeros((coordinates_neg.shape[0],1)), time*np.ones((coordinates_neg.shape[0],1)))))
+        # Add new events
+        events_new.append(np.column_stack((np.flip(coordinates_pos, axis=1), np.ones((coordinates_pos.shape[0],1)), 
+                                           (time*dt)*np.ones((coordinates_pos.shape[0],1)))))
+        
+        events_new.append(np.column_stack((np.flip(coordinates_neg, axis=1), np.zeros((coordinates_neg.shape[0],1)), 
+                                           (time*dt)*np.ones((coordinates_neg.shape[0],1)))))
         
     events_new = np.concatenate(events_new.copy())
     
     return unstructured_to_structured(events_new.copy(), dtype=events.dtype)
-
-# naive_downsample(events, sensor_size=(128,128), target_size=(20,20))
