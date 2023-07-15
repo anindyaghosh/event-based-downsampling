@@ -140,14 +140,14 @@ parser.add_argument("--hidden-recurrent-sparsity", type=float, nargs="*")
 parser.add_argument("--downsampling-method", type=str, required=True)
 parser.add_argument("--target-resolution", type=int, required=True)
 
-# args = parser.parse_args(["--train", "--seed", "2345", "--dataset", "dvs_gesture",
-#                           "--num-epochs", "100", "--hidden-size", "256", "256",
-#                           "--hidden-recurrent", "False", "True", "--hidden-model",
-#                           "alif", "alif", "--hidden-input-sparsity", "0.1", "0.1",
-#                           "--hidden-recurrent-sparsity", "0.01", "--downsampling-method",
-#                           "integrator", "--target-resolution", "32"])
+args = parser.parse_args(["--train", "--seed", "2345", "--dataset", "dvs_gesture",
+                          "--num-epochs", "100", "--hidden-size", "256", "256",
+                          "--hidden-recurrent", "False", "True", "--hidden-model",
+                          "alif", "alif", "--hidden-input-sparsity", "0.1", "0.1",
+                          "--hidden-recurrent-sparsity", "0.01", "--downsampling-method",
+                          "differentiator", "--target-resolution", "32"])
 
-args = parser.parse_args()
+# args = parser.parse_args()
 
 num_hidden_layers = max(len(args.hidden_size), 
                         len(args.hidden_recurrent),
@@ -239,8 +239,6 @@ else:
                                                         dt=0.05, differentiator_time_bins=10, 
                                                         noise_threshold=2)
         
-        import pdb
-        pdb.set_trace()
         num_events += len(events)
         
         spikes.append(preprocess_tonic_spikes(events, dataset.ordering,
