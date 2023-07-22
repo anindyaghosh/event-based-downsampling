@@ -140,14 +140,14 @@ parser.add_argument("--hidden-recurrent-sparsity", type=float, nargs="*")
 parser.add_argument("--downsampling-method", type=str, required=True)
 parser.add_argument("--target-resolution", type=int, required=True)
 
-# args = parser.parse_args(["--train", "--seed", "2345", "--dataset", "dvs_gesture",
-#                           "--num-epochs", "100", "--hidden-size", "256", "256",
-#                           "--hidden-recurrent", "False", "True", "--hidden-model",
-#                           "alif", "alif", "--hidden-input-sparsity", "0.1", "0.1",
-#                           "--hidden-recurrent-sparsity", "0.01", "--downsampling-method",
-#                           "differentiator", "--target-resolution", "32"])
+args = parser.parse_args(["--train", "--seed", "2345", "--dataset", "dvs_gesture",
+                          "--num-epochs", "100", "--hidden-size", "256", "256",
+                          "--hidden-recurrent", "False", "True", "--hidden-model",
+                          "alif", "alif", "--hidden-input-sparsity", "0.1", "0.1",
+                          "--hidden-recurrent-sparsity", "0.01", "--downsampling-method",
+                          "differentiator", "--target-resolution", "8"])
 
-args = parser.parse_args()
+# args = parser.parse_args()
 
 num_hidden_layers = max(len(args.hidden_size), 
                         len(args.hidden_recurrent),
@@ -227,17 +227,19 @@ else:
             events = event_ds.naive_downsample(events, sensor_size=(128, 128, 2), 
                                                target_size=sensor_size[:-1])
         elif args.downsampling_method == 'integrator':
-            t1 = perf_counter()
             events = event_ds.integrator_downsample(events, sensor_size=(128, 128, 2), 
                                                     target_size=sensor_size[:-1],
                                                     dt=0.05, noise_threshold=2)
-            t2 = perf_counter()
-            print(f'{t2-t1:.2f}')
         elif args.downsampling_method == 'differentiator':
+            t1 = perf_counter()
             events = event_ds.differentiator_downsample(events, sensor_size=(128, 128, 2), 
                                                         target_size=sensor_size[:-1],
-                                                        dt=0.05, differentiator_time_bins=10, 
+                                                        dt=0.05, differentiator_time_bins=3, 
                                                         noise_threshold=2)
+            t2 = perf_counter()
+            print(f'{t2-t1:.2f}')
+            import pdb
+            pdb.set_trace()
         
         num_events += len(events)
         

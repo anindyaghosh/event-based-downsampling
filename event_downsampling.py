@@ -3,8 +3,6 @@ from numpy.lib.recfunctions import unstructured_to_structured
 
 from tonic.slicers import slice_events_by_time
 
-# events = np.load('dvs_struct_array.npy')
-
 def naive_downsample(events: np.ndarray, sensor_size: tuple, target_size: tuple):
     """Downsample the classic "naive" Tonic way. Multiply x/y values by a spatial_factor 
     obtained by dividing sensor size by the target size.
@@ -55,31 +53,30 @@ def differentiator_downsample(events: np.ndarray, sensor_size: tuple, target_siz
     events = events.copy()
     
     # Call integrator method
-    events_integrated = integrator_downsample(events, sensor_size=sensor_size, target_size=target_size, 
-                                              dt=(dt / differentiator_time_bins), 
-                                              noise_threshold=noise_threshold)
+    dt_scaling, events_integrated = integrator_downsample(events, sensor_size=sensor_size, target_size=target_size, 
+                                                          dt=(dt / differentiator_time_bins), 
+                                                          noise_threshold=noise_threshold, differentiator_call=True)
     
-    if np.issubdtype(events["t"].dtype, np.integer):
+    if dt_scaling:
         dt *= 1000
-    
-    # Reformat time to original dt
-    events_adjusted = slice_events_by_time(events_integrated, time_window=dt)
-    
-    frame_histogram = np.zeros((len(events_adjusted), *np.flip(target_size), 2))
-    
-    for time, event in enumerate(events_adjusted):
-        # To speed up algorithm
-        if event.size >= 1:
-            # Separate by polarity
-            xy_pos = event[event["p"] == 1]
-            xy_neg = event[event["p"] == 0]
-            
-            frame_histogram[time,:,:,1] += np.histogram2d(xy_pos["y"], xy_pos["x"], [range(target_size[1] + 1), range(target_size[0] + 1)])[0]
-            frame_histogram[time,:,:,0] += np.histogram2d(xy_neg["y"], xy_neg["x"], [range(target_size[1] + 1), range(target_size[0] + 1)])[0]
-            
+        
+    num_frames = int(events_integrated[-1][0] // dt + 1)
+    frame_histogram = np.zeros((num_frames, *np.flip(target_size), 2))
+        
+    for event in events_integrated:
+        differentiated_time, event_histogram = event
+        time = int(differentiated_time // dt)
+        
+        # Separate events based on polarity
+        event_hist_pos = np.maximum(event_histogram, 0)
+        event_hist_neg = -np.minimum(event_histogram, 0)
+        
+        frame_histogram[time,:,:,1] += event_hist_pos
+        frame_histogram[time,:,:,0] += event_hist_neg
+        
     # Differences between subsequent frames
     frame_differences = np.diff(frame_histogram, axis=0).clip(min=0)
-
+    
     # Restructuring numpy array to structured array
     time_index, y_new, x_new, polarity_new = np.nonzero(frame_differences)
     
@@ -87,7 +84,8 @@ def differentiator_downsample(events: np.ndarray, sensor_size: tuple, target_siz
     
     return unstructured_to_structured(events_new.copy(), dtype=events.dtype)
     
-def integrator_downsample(events: np.ndarray, sensor_size: tuple, target_size: tuple, dt: float, noise_threshold: int = 0):
+def integrator_downsample(events: np.ndarray, sensor_size: tuple, target_size: tuple, dt: float, noise_threshold: int = 0, 
+                          differentiator_call: bool = False):
     """Downsample using an integrate-and-fire (I-F) neuron model with a noise threshold similar to 
     the membrane potential threshold in the I-F model. Multiply x/y values by a spatial_factor 
     obtained by dividing sensor size by the target size.
@@ -99,17 +97,20 @@ def integrator_downsample(events: np.ndarray, sensor_size: tuple, target_size: t
                              re-scaled to (new_width, new_height).
         dt (float): temporal resolution of events in milliseconds.
         noise_threshold (int): number of events before a spike representing a new event is emitted.
+        differentiator_call (bool): Preserve frame spikes for differentiator method in order to optimise 
+                                    differentiator method.
         
     Returns:
         the down-sampled input events using the integrator method.
     """
-        
+    
     assert "x" and "y" and "t" in events.dtype.names
     
     events = events.copy()
     
     if np.issubdtype(events["t"].dtype, np.integer):
         dt *= 1000
+        dt_scaling = True
     
     # Downsample
     spatial_factor = np.asarray(target_size) / sensor_size[:-1]
@@ -122,6 +123,7 @@ def integrator_downsample(events: np.ndarray, sensor_size: tuple, target_size: t
     
     # Running buffer of events in each pixel
     frame_spike = np.zeros(np.flip(target_size))
+    event_histogram = []
     
     events_new = []
     
@@ -139,17 +141,26 @@ def integrator_downsample(events: np.ndarray, sensor_size: tuple, target_size: t
         coordinates_pos = np.stack(np.nonzero(np.maximum(frame_spike >= noise_threshold, 0))).T
         coordinates_neg = np.stack(np.nonzero(np.maximum(-frame_spike >= noise_threshold, 0))).T
         
+        # For optimising differentiator
+        event_histogram.append((time*dt, frame_spike))
+        
         # Reset spiking coordinates to zero
         frame_spike[coordinates_pos] = 0
         frame_spike[coordinates_neg] = 0
         
         # Restructure events
         events_new.append(np.column_stack((np.flip(coordinates_pos, axis=1), np.ones((coordinates_pos.shape[0],1)).astype(dtype=bool), 
-                                           (time*dt)*np.ones((coordinates_pos.shape[0],1)))))
+                                            (time*dt)*np.ones((coordinates_pos.shape[0],1)))))
         
         events_new.append(np.column_stack((np.flip(coordinates_neg, axis=1), np.zeros((coordinates_neg.shape[0],1)).astype(dtype=bool), 
-                                           (time*dt)*np.ones((coordinates_neg.shape[0],1)))))
+                                            (time*dt)*np.ones((coordinates_neg.shape[0],1)))))
         
-    events_new = np.concatenate(events_new.copy())
-    
-    return unstructured_to_structured(events_new.copy(), dtype=events.dtype)
+    if differentiator_call:
+        return dt_scaling, event_histogram
+    else:
+        events_new = np.concatenate(events_new.copy())
+        return unstructured_to_structured(events_new.copy(), dtype=events.dtype)
+
+# import pickle
+# events = pickle.load(open('events_integrated.pickle', 'rb'))    
+# differentiator_downsample(events, sensor_size=(128,128,2), differentiator_time_bins=3, target_size=(8,8), dt=0.05, noise_threshold=2)
