@@ -18,6 +18,8 @@ from time import perf_counter
 from ml_genn.utils.data import (calc_latest_spike_time, calc_max_spikes,
                                 log_latency_encode_data, preprocess_tonic_spikes)
 
+import event_downsampling as event_ds
+
 
 class CSVTrainLog(Callback):
     def __init__(self, filename, output_pop, resume):
@@ -135,7 +137,17 @@ parser.add_argument("--hidden-model", choices=["lif", "alif"], nargs="*")
 parser.add_argument("--hidden-input-sparsity", type=float, nargs="*")
 parser.add_argument("--hidden-recurrent-sparsity", type=float, nargs="*")
 
-args = parser.parse_args()
+parser.add_argument("--downsampling-method", type=str, required=True)
+parser.add_argument("--target-resolution", type=int, required=True)
+
+args = parser.parse_args(["--train", "--seed", "2345", "--dataset", "dvs_gesture",
+                          "--num-epochs", "100", "--hidden-size", "256", "256",
+                          "--hidden-recurrent", "False", "True", "--hidden-model",
+                          "alif", "alif", "--hidden-input-sparsity", "0.1", "0.1",
+                          "--hidden-recurrent-sparsity", "0.01", "--downsampling-method",
+                          "differentiator", "--target-resolution", "8"])
+
+# args = parser.parse_args()
 
 num_hidden_layers = max(len(args.hidden_size), 
                         len(args.hidden_recurrent),
@@ -166,8 +178,6 @@ args.hidden_recurrent_sparsity = pad_hidden_layer_argument(args.hidden_recurrent
                          # for arg, val in vars(args).items()
                          # if arg not in ["train", "cpu", "resume_epoch",
                                         # "test_all", "kernel_profiling"])
-                                        
-unique_suffix = "_"
 
 # If dataset is MNIST
 spikes = []
@@ -198,9 +208,12 @@ else:
                                         duplicate=False, num_neurons=79)
         sensor_size = dataset.sensor_size
     elif args.dataset == "dvs_gesture":
-        transform = Compose([Downsample(spatial_factor=0.25)])
-        dataset = DVSGesture(save_to='./data', train=args.train, transform=transform)
-        sensor_size = (32, 32, 2)
+        
+        # transform = Compose([Downsample(spatial_factor=0.25)])
+        # dataset = DVSGesture(save_to='./data', train=args.train, transform=transform)
+        
+        dataset = DVSGesture(save_to='./data', train=args.train)
+        sensor_size = (args.target_resolution, args.target_resolution, 2)
 
     # Get number of input and output neurons from dataset 
     # and round up outputs to power-of-two
@@ -208,10 +221,33 @@ else:
     num_output = len(dataset.classes)
 
     # Preprocess spike
+    num_events = 0
     for events, label in dataset:
+        if args.downsampling_method == 'naive':
+            events = event_ds.naive_downsample(events, sensor_size=(128, 128, 2), 
+                                               target_size=sensor_size[:-1])
+        elif args.downsampling_method == 'integrator':
+            events = event_ds.integrator_downsample(events, sensor_size=(128, 128, 2), 
+                                                    target_size=sensor_size[:-1],
+                                                    dt=0.05, noise_threshold=2)
+        elif args.downsampling_method == 'differentiator':
+            t1 = perf_counter()
+            events = event_ds.differentiator_downsample(events, sensor_size=(128, 128, 2), 
+                                                        target_size=sensor_size[:-1],
+                                                        dt=0.05, differentiator_time_bins=3, 
+                                                        noise_threshold=2)
+            t2 = perf_counter()
+            print(f'{t2-t1:.2f}')
+            import pdb
+            pdb.set_trace()
+        
+        num_events += len(events)
+        
         spikes.append(preprocess_tonic_spikes(events, dataset.ordering,
                                               sensor_size))
         labels.append(label)
+    print(f"Total spikes: {num_events}")
+    unique_suffix = f"{args.downsampling_method}_{str(args.target_resolution)}"
 
 # Determine max spikes and latest spike time
 max_spikes = calc_max_spikes(spikes)
