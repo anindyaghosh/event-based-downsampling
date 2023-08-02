@@ -231,15 +231,15 @@ else:
                                                     target_size=sensor_size[:-1],
                                                     dt=0.05, noise_threshold=2)
         elif args.downsampling_method == 'differentiator':
-            t1 = perf_counter()
+            # t1 = perf_counter()
             events = event_ds.differentiator_downsample(events, sensor_size=(128, 128, 2), 
                                                         target_size=sensor_size[:-1],
                                                         dt=0.05, differentiator_time_bins=3, 
                                                         noise_threshold=2)
-            t2 = perf_counter()
-            print(f'{t2-t1:.2f}')
-            import pdb
-            pdb.set_trace()
+            # t2 = perf_counter()
+            # print(f'{t2-t1:.2f}')
+            # import pdb
+            # pdb.set_trace()
         
         num_events += len(events)
         

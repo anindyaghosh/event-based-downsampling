@@ -83,7 +83,12 @@ def differentiator_downsample(events: np.ndarray, sensor_size: tuple, target_siz
     
     events_new = np.column_stack((x_new, y_new, polarity_new.astype(dtype=bool), time_index * dt))
     
-    return unstructured_to_structured(events_new.copy(), dtype=[("x", "<i4"), ("y", "<i4"), ("p", "<i4"), ("t", "<i4")])
+    names = ["x", "y", "p", "t"]
+    formats = ['i4', 'i4', 'i4', 'i4']
+    
+    dtype = np.dtype({'names': names, 'formats': formats})
+    
+    return unstructured_to_structured(events_new.copy(), dtype=dtype)
     
 def integrator_downsample(events: np.ndarray, sensor_size: tuple, target_size: tuple, dt: float, noise_threshold: int = 0, 
                           differentiator_call: bool = False):
@@ -167,4 +172,10 @@ def integrator_downsample(events: np.ndarray, sensor_size: tuple, target_size: t
         return dt_scaling, event_histogram
     else:
         events_new = np.concatenate(events_new.copy())
-        return unstructured_to_structured(events_new.copy(), dtype=[("x", "<i4"), ("y", "<i4"), ("p", "<i4"), ("t", "<i4")])
+        
+        names = ["x", "y", "p", "t"]
+        formats = ['i4', 'i4', 'i4', 'i4']
+    
+        dtype = np.dtype({'names': names, 'formats': formats})
+    
+        return unstructured_to_structured(events_new.copy(), dtype=dtype)
